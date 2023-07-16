@@ -317,7 +317,7 @@ def process_query(query):
     
     done_phrase = "Now we are done."
     if st.button('Go'):
-        query = query + "Use the 'calculate_expression' function call to calculate any expression. For trig, use radians. (radians = degrees * pi/180). When your answer is complete, always include ```Now we are done.``` to indicate you are finished."
+        query = query + " Use the 'calculate_expression' function call to calculate any expression. For trig, use radians. (radians = degrees * pi/180). When your answer is complete, always include ```Now we are done.``` to indicate you are finished."
         i = st.session_state.iteration_limit
         while True:
             response = ai("calculate_expression", query)
@@ -360,7 +360,21 @@ if check_password():
     process_query(st.session_state.query)
     # conversation_text = '\n'.join([f"Role: {message['role']}, Content: {message['content']}" for message in st.session_state.message_history])
     # conversation_text = '\n'.join([f"{message['role']}: {message['content']} \n" for message in st.session_state.message_history])
-    conversation_text = '\n'.join([f"{message['role']}: {message['content']} \n" for message in st.session_state.message_history if message['content'] is not None and message['content'].lower() != 'none'])
+    # conversation_text = '\n'.join([f"{message['role']}: {message['content']} \n" for message in st.session_state.message_history if message['content'] is not None and message['content'].lower() != 'none'])
+    conversation_text = ''
+    for message in st.session_state.message_history:
+        if message['content'] is not None and message['content'].lower() != 'none':
+            # If the keyword is in the message content, split the content at the keyword
+            if "Use the 'calculate_expression' function call" in message['content']:
+                parts = message['content'].split("Use the 'calculate_expression' function call", 1)
+                content = parts[0]
+            else:
+                content = message['content']
+            # Add the content (or the part before the keyword) to the conversation text
+            conversation_text += f"{message['role']}: {content} \n\n"
+
+
+
 
     with st.expander('Conversation History'):
         st.write(conversation_text)
