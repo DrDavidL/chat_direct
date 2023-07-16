@@ -346,7 +346,7 @@ def process_query(query):
 st.title('Natural Language Calculator and Story Problem Solver')
 if check_password():
     fetch_api_key()
-    st.session_state.query = st.text_area("Type a natural language math problem (.e.g, what is the area of a circle with a radius of 4cm), or expression (4 times 6) or a full story problem. Or, even ask me: Create a story problem and solve it!")
+    st.session_state.query = st.text_area("Type a natural language math problem (.e.g, what is the area of a circle with a radius of 4cm), or expression (4 times 6) or give me a story problem to solve. Or, even ask me: Create a story problem and solve it!")
     process_query(st.session_state.query)
     # conversation_text = '\n'.join([f"Role: {message['role']}, Content: {message['content']}" for message in st.session_state.message_history])
     # conversation_text = '\n'.join([f"{message['role']}: {message['content']} \n" for message in st.session_state.message_history])
