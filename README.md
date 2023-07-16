@@ -1,4 +1,4 @@
-# Naural Language Calculator and Story Problem Solver 
+# Natural Language Calculator and Story Problem Solver 
 (Really nice openai function example!)
 
 Who needs code interpreter when you can call my calculator here? 
