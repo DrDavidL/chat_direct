@@ -11,6 +11,7 @@ import inspect
 import openai
 import os
 
+
 import sympy as sp
 from sympy import *
 from random import randint
@@ -23,6 +24,9 @@ if 'message_history' not in st.session_state:
     
 if 'query' not in st.session_state:
     st.session_state.query = ''
+    
+if 'iteration_limit' not in st.session_state:
+    st.session_state.iteration_limit = 5
     
 if "last_result" not in st.session_state:
     st.session_state.last_result = ""
@@ -248,9 +252,11 @@ def ai(function_name="", query=st.session_state.query):
 @function_info
 def calculate_expression(expression: str) -> float:
     """
-    Calculates the result for an expression written in python using sympify.
+    Calculates the result for an expression.
+    Uses input expressions written for the sympy library.
+    For example, cosine is cos (not math.cos) and pi is pi.
 
-    :param expression: A mathematical expression written in python
+    :param expression: A mathematical expression written for the sympy library in python
     :type expression: string
     :return: A float representing the result of the expression
     :rtype: float
@@ -311,8 +317,8 @@ def process_query(query):
     
     done_phrase = "Now we are done."
     if st.button('Go'):
-        query = query + "Remember, you can make function calls to calculate any necessary expression. When your answer is complete, always include ```Now we are done.``` to indicate you are finished."
-        i = 6
+        query = query + "Use the 'calculate_expression' function call to calculate any expression. For trig, use radians. (radians = degrees * pi/180). When your answer is complete, always include ```Now we are done.``` to indicate you are finished."
+        i = st.session_state.iteration_limit
         while True:
             response = ai("calculate_expression", query)
             i -= 1
@@ -346,6 +352,10 @@ def process_query(query):
 st.title('Natural Language Calculator and Story Problem Solver')
 if check_password():
     fetch_api_key()
+    st.info("""Welcome to the Natural Language Calculator and Story Problem Solver. This is a work in progress. Check out the GitHub. 
+            As GPT-4 costs $$$ and many problems are multi-step, you have control here to limit the number of iterations.            
+            """)
+    st.session_state.iteration_limit = st.number_input('Iteration Limit', min_value=1, max_value=10, value=5)
     st.session_state.query = st.text_area("Type a natural language math problem (.e.g, what is the area of a circle with a radius of 4cm), or expression (4 times 6) or give me a story problem to solve. Or, even ask me: Create a story problem and solve it!")
     process_query(st.session_state.query)
     # conversation_text = '\n'.join([f"Role: {message['role']}, Content: {message['content']}" for message in st.session_state.message_history])
