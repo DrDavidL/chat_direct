@@ -168,23 +168,23 @@ def gen_response(prefix, history, gpt_model):
 
 # message_history = []
 
-def ai(function_name="", query=st.session_state.query):
-    function_function = globals().get(function_name)
+def ai(query=st.session_state.query):
+    available_functions = [calculate_expression, search_internet]
 
     # Add the new user message to the history
-    
     st.session_state.message_history.append({"role": "user", "content": query})
-    # fetch_api_key()
-    openai.api_key = st.session_state.openai_api_key   
-    
-        # Check if message_history is not empty
+    openai.api_key = st.session_state.openai_api_key
+
+    # Check if message_history is not empty
     if st.session_state.message_history:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=st.session_state.message_history,
-            functions=[function_function.function()],
+            functions=[func.function() for func in available_functions],
             function_call="auto",
         )
+
+
 
 
 
@@ -200,7 +200,7 @@ def ai(function_name="", query=st.session_state.query):
     
     if message.get("function_call"):
         function_name = message["function_call"]["name"]
-        # st.markdown(f'*No guessing - here is where we use the function call:* **{function_name}**')
+        st.markdown(f'*No guessing - here is where we use the function call:* **{function_name}**')
 
         function_function = globals().get(function_name)
 
@@ -224,6 +224,12 @@ def ai(function_name="", query=st.session_state.query):
         # Step 3, call the function
         # Note: the JSON response from the model may not be valid JSON
         function_response = function_function(**filtered_args)
+        # st.write(f'here is the function response: {function_response}')
+        
+        if function_name == 'search_internet':
+            if isinstance(function_response, requests.Response):
+                function_response = function_response.json()
+
 
         # Step 4, send model the info on the function call and function response
         second_response = openai.ChatCompletion.create(
@@ -250,19 +256,6 @@ def ai(function_name="", query=st.session_state.query):
         return response
 
 
-# @function_info
-# def calculate_expression(expression: str) -> float:
-#     """
-#     Calculates the result for an expression written in python.
-
-#     :param expression: A mathematical expression written in python
-#     :type expression: string
-#     :return: A float representing the result of the expression
-#     :rtype: float
-#     """
-#     result = eval(expression)
-    
-#     return result
 
 @function_info
 def calculate_expression(expression: str) -> float:
@@ -280,6 +273,38 @@ def calculate_expression(expression: str) -> float:
     result = float(sp.sympify(expression))
     
     return result
+
+@function_info
+def search_internet(web_query: str) -> float:
+    """
+    Obtains real-time search results from across the internet. 
+    Supports all Google Advanced Search operators such (e.g. inurl:, site:, intitle:, etc).
+    
+    :param web_query: A search query, including any Google Advanced Search operators
+    :type web_query: string
+    :return: A list of search results
+    :rtype: json
+    
+    """
+    url = "https://real-time-web-search.p.rapidapi.com/search"
+    querystring = {"q":web_query,"limit":"10"}
+    headers = {
+	"X-RapidAPI-Key": st.secrets["X-RapidAPI-Key"],
+	"X-RapidAPI-Host": "real-time-web-search.p.rapidapi.com"
+    }
+
+    response = requests.get(url, headers=headers, params=querystring)
+    response_data = response.json()
+    def display_search_results(json_data):
+        data = json_data['data']
+        for item in data:
+            st.markdown(f"### [{item['title']}]({item['url']})")
+            st.write(item['snippet'])
+            st.write("---")
+    
+    display_search_results(response_data)
+    
+    return response
 
 
 def fetch_api_key():
@@ -317,14 +342,16 @@ def fetch_api_key():
 
 
 def process_query(query):
-
-    
     done_phrase = "Now we are done."
     if st.button('Go'):
-        query = query + " Use the 'calculate_expression' function call to calculate any expression. For trig, use radians. (radians = degrees * pi/180). When your answer is complete, always include ```Now we are done.``` to indicate you are finished."
+        query = query + """ You have access to two functions:
+        1. Use the 'calculate_expression' function call to calculate any expression. For trig, use radians. (radians = degrees * pi/180). When your answer is complete, always include ```Now we are done.``` to indicate you are finished.
+        2. Use the 'search_internet' function call to search the internet for an answer. When your answer is complete, always include ```Now we are done.``` to indicate you are finished.
+        """
         i = st.session_state.iteration_limit
+        st.session_state.last_result = query
         while True:
-            response = ai("calculate_expression", query)
+            response = ai(query=st.session_state.last_result)
             i -= 1
             if i == 0:
                 st.write('We are done here - complexity exceeded.')
@@ -337,8 +364,6 @@ def process_query(query):
                         st.session_state.last_result = response_content
                     if done_phrase in response_content:
                         return
-
-
 
 
 # Streamlit functions
@@ -387,11 +412,11 @@ if check_password():
             st.session_state.message_history.clear()
         
         
-    # Check if the message history is too long (> 20) or has too many characters
+    # Check if the message history is too long (> 50) or has too many characters
     if st.session_state.message_history is not None:
-        if len(st.session_state.message_history) == 20:
+        if len(st.session_state.message_history) == 50:
             st.write("The message history is getting long. The oldest messages will be summarized. Download now if you need a full record.")
-        if len(st.session_state.message_history) > 20:
+        if len(st.session_state.message_history) > 50:
             # Summarize the message history
             summary_prefix = "Following this prompt is a text history of our conversation. Generate a summary of this message history: "
             summarized_history = gen_response(summary_prefix, st.session_state.message_history, "gpt-4")
