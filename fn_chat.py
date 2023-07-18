@@ -164,7 +164,7 @@ def gen_response(prefix, history, gpt_model):
     # st.write(f'Here is the input summary: {summary}')
     return response
 
-message_history = []
+# message_history = []
 
 def ai(function_name="", query=st.session_state.query):
     function_function = globals().get(function_name)
@@ -312,18 +312,7 @@ def fetch_api_key():
     
     return 
 
-# def process_query():
-#     query = st.text_input("How can I help you today?")
-#     if st.button('Go'):
-#         response = ai("calculate_expression", query)
-#         # st.write('first response issued ')
-#         if response:
-#             for choice in response.get('choices'):
-#                 # st.write('Here is where we print the response')
-#                 st.write(choice.get('message').get('content'))
-#     # Add a button to clear the message history
-#     if st.button('Clear History'):
-#         message_history.clear()
+
 
 def process_query(query):
 
@@ -348,17 +337,6 @@ def process_query(query):
                         return
 
 
-    # Add a button to clear the message history
-
-
-    # if st.button('Download Conversation History'):
-    #     conversation_text = '\n'.join([f"Role: {message['role']}, Content: {message['content']}" for message in st.session_state.message_history])
-    #     st.download_button(
-    #         label="Download Conversation History",
-    #         data=conversation_text,
-    #         file_name="conversation_history.txt",
-    #         mime="text/plain",
-    #     )
 
 
 # Streamlit functions
