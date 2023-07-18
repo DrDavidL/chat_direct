@@ -151,6 +151,19 @@ def function_info(func):
     return FunctionWrapper(func)
 
 
+
+def gen_response(prefix, history, gpt_model):
+    history.append({"role": "system", "content": prefix})
+    response = openai.ChatCompletion.create(
+        model=gpt_model,
+        messages = history,
+        temperature=0.9,
+    )
+    # summary = response['choices'][0]['message']['content']
+    # st.session_state.message_history.append(summary)
+    # st.write(f'Here is the input summary: {summary}')
+    return response
+
 message_history = []
 
 def ai(function_name="", query=st.session_state.query):
@@ -376,13 +389,36 @@ if check_password():
 
 
 
-    with st.expander('Conversation History'):
+    with st.expander('View Your Conversation History'):
         st.write(conversation_text)
+        
+    a1, b2, c3 = st.columns(3)
+    
+    with b2:
         st.download_button(
             label="Download Conversation History",
             data=conversation_text,
             file_name="conversation_history.txt",
             mime="text/plain",
             )
-    if st.button('Clear History'):
-        st.session_state.message_history.clear()
+    
+    with c3:
+        if st.button('Clear History'):
+            st.session_state.message_history.clear()
+        
+        
+    # Check if the message history is too long (> 20) or has too many characters
+    if st.session_state.message_history is not None:
+        if len(st.session_state.message_history) == 20:
+            st.write("The message history is getting long. The oldest messages will be summarized. Download now if you need a full record.")
+        if len(st.session_state.message_history) > 20:
+            # Summarize the message history
+            summary_prefix = "Following this prompt is a text history of our conversation. Generate a summary of this message history: "
+            summarized_history = gen_response(summary_prefix, st.session_state.message_history, "gpt-4")
+            summary = summarized_history['choices'][0]['message']['content']
+            # st.write(f'Thread is being summarized as follows: {summary}. Full details are still available for downloading.')
+            # Keep the most recent 5 messages intact
+            recent_messages = st.session_state.message_history[-5:]
+            
+            # Replace the message history with the summary and the recent messages
+            st.session_state.message_history = [{'role': 'assistant', 'content': summary}] + recent_messages
