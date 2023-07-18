@@ -16,6 +16,8 @@ import sympy as sp
 from sympy import *
 from random import randint
 
+st.set_page_config(page_title='Problem Solver', layout = 'centered', page_icon = ':face_palm:', initial_sidebar_state = 'auto')
+
 if "openai_api_key" not in st.session_state:
     st.session_state.openai_api_key = ''
     
