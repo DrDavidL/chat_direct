@@ -10,6 +10,9 @@ import inspect
 
 import openai
 import os
+import time
+import re as regex
+
 
 
 import sympy as sp
@@ -229,6 +232,7 @@ def ai(query=st.session_state.query):
         if function_name == 'search_internet':
             if isinstance(function_response, requests.Response):
                 function_response = function_response.json()
+                function_response['items'][0]['snippet'] = function_response['items'][0]['snippet'] + 'Now we are done.'
 
 
         # Step 4, send model the info on the function call and function response
@@ -344,26 +348,71 @@ def fetch_api_key():
 def process_query(query):
     done_phrase = "Now we are done."
     if st.button('Go'):
-        query = query + """ You have access to two functions:
+        query = """ You have access to two functions and general use:
         1. Use the 'calculate_expression' function call to calculate any expression. For trig, use radians. (radians = degrees * pi/180). When your answer is complete, always include ```Now we are done.``` to indicate you are finished.
         2. Use the 'search_internet' function call to search the internet for an answer. When your answer is complete, always include ```Now we are done.``` to indicate you are finished.
-        """
+        3. If you receive input, such as web links that you summarize, and no need to call a function, simply include ```Now we are done.``` to indicate when you are finished. Here is your query: """ + query 
+        
         i = st.session_state.iteration_limit
         st.session_state.last_result = query
+        delay = 1  # Start with a delay of 1 second
+        should_break = False
         while True:
-            response = ai(query=st.session_state.last_result)
-            i -= 1
-            if i == 0:
-                st.write('We are done here - complexity exceeded.')
+            # st.write(f' here is last result: {st.session_state.last_result}')
+            # if regex.search(r'\b{}\b'.format(done_phrase), st.session_state.last_result):
+            #     st.info('We are done!')
+            #     break
+            if should_break:
                 break
-            if response:
-                for choice in response.get('choices'):
-                    response_content = choice.get('message').get('content')
-                    if response_content != st.session_state.last_result:
-                        st.write(response_content)
-                        st.session_state.last_result = response_content
-                    if done_phrase in response_content:
-                        return
+            try:
+                response = ai(query=st.session_state.last_result)
+                i -= 1
+                if i == 0:
+                    st.write('We are done here - complexity exceeded.')
+                    should_break  = True
+                    break
+                if response:
+                    if done_phrase in response:
+                        st.info('We are done here.')
+                        should_break = True
+                        break
+
+                    # if response["function_call"]["name"] == 'search_internet':
+                    #     break
+                    # st.write(f' here is last result: {st.session_state.last_result}')
+                    if done_phrase in st.session_state.last_result:
+                        st.info('We are done!')
+                        should_break = True
+                        break 
+                    for choice in response.get('choices'):
+                        response_content = choice.get('message').get('content')
+                        
+                        # st.write(f'Here is the additional response: {response_content}')
+                        # st.write(f'Here is the last result: {st.session_state.last_result}')
+                        if response_content != st.session_state.last_result:
+                            st.write(response_content)
+                            st.session_state.last_result = response_content
+                            if done_phrase in response_content:
+                                st.info('We are done here.')
+                                should_break = True
+                                break
+                            # if done_phrase in response_content:
+                            #     st.info('We are done here.')
+                            #     should_break = True
+                            #     break
+                        # else:
+                        #     st.info('We are done here.')
+                        #     should_break = True
+                        #     break
+                    if should_break:
+                        break
+                        
+
+        # Your API call here
+            except:
+                time.sleep(delay)
+                delay *= 2  # Double the delay each time
+
 
 
 # Streamlit functions
