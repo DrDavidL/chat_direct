@@ -349,7 +349,7 @@ if check_password():
             As GPT-4 costs $$$ and many problems are multi-step, you have control here to limit the number of iterations.            
             """)
     st.session_state.iteration_limit = st.number_input('Iteration Limit', min_value=1, max_value=10, value=5)
-    st.session_state.query = st.text_area("Type a natural language math problem (e.g, what is the area of a circle with a radius of 4cm), or expression (4 times 6) or give me a story problem to solve. Or, even ask me: Create a story problem and solve it!")
+    st.session_state.query = st.text_area("Type a natural language math problem (e.g, what is the area of a circle with a radius of 4cm), or expression (24 factorial). Or, even ask me: Create a story problem and solve it!")
     process_query(st.session_state.query)
     # conversation_text = '\n'.join([f"Role: {message['role']}, Content: {message['content']}" for message in st.session_state.message_history])
     # conversation_text = '\n'.join([f"{message['role']}: {message['content']} \n" for message in st.session_state.message_history])
