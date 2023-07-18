@@ -200,7 +200,7 @@ def ai(query=st.session_state.query):
     
     if message.get("function_call"):
         function_name = message["function_call"]["name"]
-        st.markdown(f'*No guessing - here is where we use the function call:* **{function_name}**')
+        # st.markdown(f'*No guessing - here is where we use the function call:* **{function_name}**')
 
         function_function = globals().get(function_name)
 
@@ -301,7 +301,7 @@ def search_internet(web_query: str) -> float:
             st.markdown(f"### [{item['title']}]({item['url']})")
             st.write(item['snippet'])
             st.write("---")
-    
+    st.info('Searching the web using: **{web_query}**')
     display_search_results(response_data)
     
     return response
