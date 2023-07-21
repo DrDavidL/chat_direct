@@ -9,14 +9,14 @@ import ast
 import inspect
 
 import openai
-from openai.error import RateLimitError
 import os
 import time
 import re as regex
 
+
+
 import sympy as sp
 from sympy import *
-from sympy import sympify, solve, symbols
 from random import randint
 
 st.set_page_config(page_title='Problem Solver', layout = 'centered', page_icon = ':face_palm:', initial_sidebar_state = 'auto')
@@ -159,6 +159,7 @@ def function_info(func):
     return FunctionWrapper(func)
 
 
+
 def gen_response(prefix, history, gpt_model):
     history.append({"role": "system", "content": prefix})
     response = openai.ChatCompletion.create(
@@ -171,145 +172,102 @@ def gen_response(prefix, history, gpt_model):
     # st.write(f'Here is the input summary: {summary}')
     return response
 
+# message_history = []
 
-
-@st.cache_data
-def access_gpt4(message_history, max_retries=7):
-        
-    delay = 1  # Initial delay in seconds
+def ai(query=st.session_state.query):
     available_functions = [calculate_expression, search_internet]
-    
-    
-    for _ in range(max_retries):
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=message_history,
-                    functions=[func.function() for func in available_functions],
-                    function_call="auto",
-            )
-            return response
-        
-        except RateLimitError:
-            time.sleep(delay)
-            delay *= 2  # Double the delay each time
-        except Exception as e:
-            # Handle other exceptions if necessary
-            print(f"Unexpected error: {e}")
-            break
 
-    # If the function reaches this point, it means all retries failed
-    raise Exception("Max retries reached. Could not access gpt-4.")
-
-
-            
-    
-
-def controller(query=st.session_state.query):
-    st.session_state.done = False
-    available_functions = [calculate_expression, search_internet]
-    done_phrase = 'Now we are done.'
-
-    # Add the fresh new user message to the history
+    # Add the new user message to the history
     st.session_state.message_history.append({"role": "user", "content": query})
     openai.api_key = st.session_state.openai_api_key
-    i = st.session_state.iteration_limit
-    while not st.session_state.done and i > 0:
-        i -= 1
-        # Check if message_history is not empty ensuring not a blank submission
-        # First pass through the model
-        if query:
-            response = access_gpt4(st.session_state.message_history)
 
-        # Print the full response for troublshooting
-        # st.write(f' Here is the full initial response: {response}')
+    # Check if message_history is not empty
+    if st.session_state.message_history:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=st.session_state.message_history,
+            functions=[func.function() for func in available_functions],
+            function_call="auto",
+        )
 
-        # Get the first response from the model; print for troublehooting
-        message = response["choices"][0]["message"]
-        # st.write(f'Here is the entire response: {response}')
-        # st.write(f'Here is the first message, choices, 0, message, from the response: {message}')   
+
+
+
+
+    message = response["choices"][0]["message"]
+    first_answer = message["content"]
+    if first_answer != st.session_state.last_result:
+        st.write(first_answer)
+        st.session_state.last_result = first_answer
+
+    # Add the new system message to the history
+    st.session_state.message_history.append(message)
+    # Step 2, check if the model wants to call a function
+    
+    if message.get("function_call"):
+        function_name = message["function_call"]["name"]
+        # st.markdown(f'*No guessing - here is where we use the function call:* **{function_name}**')
+
+        function_function = globals().get(function_name)
+
+        # test we have the function
+        if function_function is None:
+            print("Couldn't find the function!")
+            sys.exit()
+
+        # Step 3, get the function information using the decorator
+        function_info = function_function.function()
+
+        # Extract function call arguments from the message
+        function_call_args = json.loads(message["function_call"]["arguments"])
+
+        # Filter function call arguments based on available properties
+        filtered_args = {}
+        for arg, value in function_call_args.items():
+            if arg in function_info["parameters"]["properties"]:
+                filtered_args[arg] = value
+
+        # Step 3, call the function
+        # Note: the JSON response from the model may not be valid JSON
+        function_response = function_function(**filtered_args)
+        # st.write(f'here is the function response: {function_response}')
         
-        # Here is the content of that first message.
-        first_answer = message["content"]
-        st.markdown(f'**Problem Solver:** {first_answer}')
-        
-        if first_answer is not None:    
-            if done_phrase in first_answer:
-                st.write('We are done - exiting.')
-                st.session_state.done = True
-        
-        
-        # if first_answer != st.session_state.last_result:
-        #     st.write(first_answer)
-        #     st.session_state.last_result = first_answer
+        if function_name == 'search_internet':
+            if isinstance(function_response, requests.Response):
+                function_response = function_response.json()
+                function_response['items'][0]['snippet'] = function_response['items'][0]['snippet'] + 'Now we are done.'
 
-        # Add the new system message to the history
-        st.session_state.message_history.append(message)
-        # Step 2, check if the model wants to call a function
-        
-        if message.get("function_call"):
-            function_name = message["function_call"]["name"]
-            st.markdown(f'*Making a function call:* **{function_name}**')
 
-            function_function = globals().get(function_name)
-
-            # test we have the function
-            if function_function is None:
-                print("Couldn't find the function!")
-                sys.exit()
-
-            # Step 3, get the function information using the decorator
-            function_info = function_function.function()
-
-            # Extract function call arguments from the message
-            function_call_args = json.loads(message["function_call"]["arguments"])
-
-            # Filter function call arguments based on available properties
-            filtered_args = {}
-            for arg, value in function_call_args.items():
-                if arg in function_info["parameters"]["properties"]:
-                    filtered_args[arg] = value
-
-            # Step 3, call the function
-            # Note: the JSON response from the model may not be valid JSON
-            function_response = function_function(**filtered_args)
-            # st.write(f'here is the function response: {function_response}')
-            
-            # if function_name == 'search_internet':
-            #     if isinstance(function_response, requests.Response):
-            #         function_response = function_response.json()
-            #         function_response['items'][0]['snippet'] = function_response['items'][0]['snippet'] + 'Now we are done.'
-
+        # Step 4, send model the info on the function call and function response
+        second_response = openai.ChatCompletion.create(
+            model="gpt-4",
             messages=[
-                    {"role": "user", "content": query},
-                    message,
-                    {
-                        "role": "function",
-                        "name": function_name,
-                        "content": json.dumps(function_response)
-                    },
-                ]
-            second_response = access_gpt4(messages)
-            # Step 4, send model the info on the function call and function response
-            
-            # st.write(f'here is the second response message after analyzing function output: {second_response}')
-            message2 = second_response["choices"][0]["message"]
-            st.session_state.message_history.append(message2)
-            second_answer = message2["content"]
+                {"role": "user", "content": query},
+                message,
+                {
+                    "role": "function",
+                    "name": function_name,
+                    "content": json.dumps(function_response)
+                },
+            ],
+        )
+        # st.write(f'here is the second response message: {second_response}')
+        message2 = second_response["choices"][0]["message"]
+        second_answer = message2["content"]
+        if second_answer != st.session_state.last_result:
             st.write(second_answer)
-            if second_answer is not None:
-                if done_phrase in second_answer:
-                    # st.write('We are done since second anwer had done phrase- exiting.')
-                    st.session_state.done = True
-                # if second_answer != st.session_state.last_result:
-                #     st.write(second_answer)
-                #     st.session_state.last_result = second_answer
-            # st.write(f' done? {st.session_state.done}')
-            
+            st.session_state.last_result = second_answer
+        st.session_state.message_history.append(message2)
+        return second_response
+    else:
+        return response
 
 
 
-@function_info
+from sympy import sympify, solve, symbols
+
+
+
 def calculate_expression(expression: str):
     """
     Calculates the result for an expression.
@@ -323,8 +281,6 @@ def calculate_expression(expression: str):
     """
 
     # Check if the string contains the "solve" function
-    st.info(f'Here is the calculator input: {expression}')
-    
     if "solve" in expression:
         # Extract the equation and the variable to solve for
         equation_str = expression.split("solve(")[1].split(",")[0].strip()
@@ -335,27 +291,38 @@ def calculate_expression(expression: str):
         variable = symbols(variable_str)
 
         # Solve the equation
-        
-        
         solutions = solve(equation, variable)
         
         # If there's only one solution, return it as a float
         # Otherwise, return a list of floats
         if len(solutions) == 1:
-            output = float(solutions[0])
-            st.info(f'Here is the calculator output: {output}')
-            return output
+            return float(solutions[0])
         else:
-            output = [float(sol) for sol in solutions]
-            st.info(f'Here is the calculator output: {output}')
-            return output
+            return [float(sol) for sol in solutions]
 
     # If it's not a solve expression, simply evaluate it
     else:
-        output = float(sympify(expression))
-        st.info(f'Here is the calculator output: {output}')
-        return output
+        return float(sympify(expression))
 
+
+
+
+@function_info
+def calculate_expression_old(expression: str) -> float:
+    """
+    Calculates the result for an expression.
+    Uses input expressions written for the sympy library.
+    For example, cosine is cos (not math.cos) and pi is pi.
+
+    :param expression: A mathematical expression written for the sympy library in python
+    :type expression: string
+    :return: A float representing the result of the expression
+    :rtype: float
+    """
+    st.info(f'Our current equation: **{expression}**')
+    result = float(sp.sympify(expression))
+    
+    return result
 
 @function_info
 def search_internet(web_query: str) -> float:
@@ -369,7 +336,7 @@ def search_internet(web_query: str) -> float:
     :rtype: json
     
     """
-    st.info(f'Here is the websearch input: **{web_query}**')
+    st.info(f'Our current search query has been called: **{web_query}**')
     url = "https://real-time-web-search.p.rapidapi.com/search"
     querystring = {"q":web_query,"limit":"10"}
     headers = {
@@ -382,14 +349,14 @@ def search_internet(web_query: str) -> float:
     def display_search_results(json_data):
         data = json_data['data']
         for item in data:
-            st.sidebar.markdown(f"### [{item['title']}]({item['url']})")
-            st.sidebar.write(item['snippet'])
-            st.sidebar.write("---")
+            st.markdown(f"### [{item['title']}]({item['url']})")
+            st.write(item['snippet'])
+            st.write("---")
     # st.info('Searching the web using: **{web_query}**')
     display_search_results(response_data)
-    # st.session_state.done = True
+    st.session_state.done = True
     st.write('Done with websearch function')
-    return response.json()
+    return response
 
 
 def fetch_api_key():
@@ -424,18 +391,81 @@ def fetch_api_key():
     
     return 
 
-def start_chat(query):
-    
-    if st.button('Go', key = "starter"):
+
+
+def process_query(query):
+    done_phrase = "Now we are done."
+    st.session_state.done = False
+    if st.button('Go'):
         query = """ You have access to two functions to assist responses:
-        1. Use the 'calculate_expression' function to solve an expression. The expression syntax must work as input for python sympy library. For trig, use radians. (radians = degrees * pi/180). When the query is fully answered, first perform a fial review. If errors, fix them. If accurate, include: ```Now we are done.``` 
-        2. Use the 'search_internet' function to search the internet for an answer. When the user query is fully answered, first perform a fial review. If errors, fix them. If accurate, include: ```Now we are done.``` 
-        3. If you receive input without a question to answer, summarize the input and include ```Now we are done.```  
+        1. Use the 'calculate_expression' function to calculate any expression. For trig, use radians. (radians = degrees * pi/180). When your answer is complete, always include ```Now we are done.``` to indicate you are finished.
+        2. Use the 'search_internet' function to search the internet for an answer. When your answer is complete, always include ```Now we are done.``` to indicate you are finished.
+        3. If you receive input without a question to answer, summarize and include ```Now we are done.``` to indicate when you are finished. 
         
         Here is your query: """ + query 
-        controller(query)
-    
+        
+        i = st.session_state.iteration_limit
+        st.session_state.last_result = query
+        delay = 1  # Start with a delay of 1 second
+        should_break = False
+        while not st.session_state.done:
+            # st.write(f' here is last result: {st.session_state.last_result}')
+            # if regex.search(r'\b{}\b'.format(done_phrase), st.session_state.last_result):
+            #     st.info('We are done!')
+            #     break
+            if should_break:
+                break
+            try:
+                response = ai(query=st.session_state.last_result)
+                
+                i -= 1
+                if i == 0:
+                    st.write('We are done here - complexity exceeded.')
+                    should_break  = True
+                    break
+                if st.session_state.done == True:
+                    st.info('We are done here.')
+                    should_break = True
+                    break
+                if response:
+                    if done_phrase in response["choices"][0]["message"]["content"]:
+                        st.info('We are done here.')
+                        should_break = True
+                        break
 
+                    # if response["function_call"]["name"] == 'search_internet':
+                    #     break
+                    # st.write(f' here is last result: {st.session_state.last_result}')
+                if done_phrase in st.session_state.last_result:
+                    st.info('We are done!')
+                    should_break = True
+                    break 
+                for choice in response.get('choices'):
+                    response_content = choice.get('message').get('content')
+                    
+                    # st.write(f'Here is the additional response: {response_content}')
+                    # st.write(f'Here is the last result: {st.session_state.last_result}')
+                    if response_content != st.session_state.last_result:
+                        st.write(response_content)
+                        st.session_state.last_result = response_content
+                    if done_phrase in response_content:
+                        st.info('We are done here.')
+                        should_break = True
+                        break
+                        # if done_phrase in response_content:
+                        #     st.info('We are done here.')
+                        #     should_break = True
+                        #     break
+                    # else:
+                    #     st.info('We are done here.')
+                    #     should_break = True
+                    #     break
+                if should_break:
+                    break
+                     
+            except:
+                time.sleep(delay)
+                delay *= 2  # Double the delay each time
 
 
 
@@ -448,8 +478,7 @@ if check_password():
             """)
     st.session_state.iteration_limit = st.number_input('Iteration Limit', min_value=1, max_value=10, value=5)
     st.session_state.query = st.text_area("Type a natural language math problem (e.g, what is the area of a circle with a radius of 4cm), or expression (24 factorial). Or, even ask me: Create a story problem and solve it!")
-    # process_query(st.session_state.query)
-    start_chat(st.session_state.query)
+    process_query(st.session_state.query)
     # conversation_text = '\n'.join([f"Role: {message['role']}, Content: {message['content']}" for message in st.session_state.message_history])
     # conversation_text = '\n'.join([f"{message['role']}: {message['content']} \n" for message in st.session_state.message_history])
     # conversation_text = '\n'.join([f"{message['role']}: {message['content']} \n" for message in st.session_state.message_history if message['content'] is not None and message['content'].lower() != 'none'])
