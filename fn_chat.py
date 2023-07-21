@@ -427,8 +427,8 @@ def fetch_api_key():
 def start_chat(query):
     
     if st.button('Go', key = "starter"):
-        query = """ You have access to two functions to assist responses:
-        1. Always use the 'calculate_expression' function when a calculation is required. The expression syntax must work as input for python sympy library. For trig, use radians. (radians = degrees * pi/180). When the query is fully answered, first perform a fial review. If errors, fix them. If accurate, include: ```Now we are done.``` 
+        query = """ When possible use these two functions to assist responses:
+        1. Do not guess or approximate. Always use the 'calculate_expression' function when a calculation is required. The expression syntax must work as input for python sympy library. For trig, use radians. (radians = degrees * pi/180). When the query is fully answered, first perform a fial review. If errors, fix them. If accurate, include: ```Now we are done.``` 
         2. Always use the 'search_internet' function when updated information from the internet is likely helpful. When the user query is fully answered, first perform a fial review. If errors, fix them. If accurate, include: ```Now we are done.``` 
         3. If you receive input without a question to answer, summarize the input and include ```Now we are done.```  
         
