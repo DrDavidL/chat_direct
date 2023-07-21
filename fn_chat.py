@@ -264,8 +264,51 @@ def ai(query=st.session_state.query):
 
 
 
+from sympy import sympify, solve, symbols
+
+
+
+def calculate_expression(expression: str):
+    """
+    Calculates the result for an expression.
+    Uses input expressions written for the sympy library.
+    For example, cosine is cos (not math.cos) and pi is pi.
+
+    :param expression: A mathematical expression written for the sympy library in python
+    :type expression: string
+    :return: A float or list of floats representing the result of the expression
+    :rtype: float or list
+    """
+
+    # Check if the string contains the "solve" function
+    if "solve" in expression:
+        # Extract the equation and the variable to solve for
+        equation_str = expression.split("solve(")[1].split(",")[0].strip()
+        variable_str = expression.split(",")[1].split(")")[0].strip()
+
+        # Convert the strings to symbolic expressions
+        equation = sympify(equation_str)
+        variable = symbols(variable_str)
+
+        # Solve the equation
+        solutions = solve(equation, variable)
+        
+        # If there's only one solution, return it as a float
+        # Otherwise, return a list of floats
+        if len(solutions) == 1:
+            return float(solutions[0])
+        else:
+            return [float(sol) for sol in solutions]
+
+    # If it's not a solve expression, simply evaluate it
+    else:
+        return float(sympify(expression))
+
+
+
+
 @function_info
-def calculate_expression(expression: str) -> float:
+def calculate_expression_old(expression: str) -> float:
     """
     Calculates the result for an expression.
     Uses input expressions written for the sympy library.
