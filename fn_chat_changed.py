@@ -161,18 +161,17 @@ def function_info(func):
     return FunctionWrapper(func)
 
 
-
-# def gen_response(prefix, history, gpt_model):
-#     history.append({"role": "system", "content": prefix})
-#     response = openai.ChatCompletion.create(
-#         model=gpt_model,
-#         messages = history,
-#         temperature=0.9,
-#     )
-#     # summary = response['choices'][0]['message']['content']
-#     # st.session_state.message_history.append(summary)
-#     # st.write(f'Here is the input summary: {summary}')
-#     return response
+def gen_response(prefix, history, gpt_model):
+    history.append({"role": "system", "content": prefix})
+    response = openai.ChatCompletion.create(
+        model=gpt_model,
+        messages = history,
+        temperature=0.9,
+    )
+    # summary = response['choices'][0]['message']['content']
+    # st.session_state.message_history.append(summary)
+    # st.write(f'Here is the input summary: {summary}')
+    return response
 
 # # message_history = []
 
