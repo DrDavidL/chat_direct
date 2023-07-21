@@ -495,7 +495,7 @@ def search_internet(web_query: str) -> float:
             st.write("---")
     # st.info('Searching the web using: **{web_query}**')
     display_search_results(response_data)
-    st.session_state.done = True
+    # st.session_state.done = True
     st.write('Done with websearch function')
     return response.json()
 
