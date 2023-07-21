@@ -173,8 +173,8 @@ def gen_response(prefix, history, gpt_model):
 
 
 
-@st.cache_data
-def access_gpt4(message_history, max_retries=7):
+# @st.cache_data
+def access_gpt4(message_history, max_retries=10):
         
     delay = 1  # Initial delay in seconds
     available_functions = [calculate_expression, search_internet]
@@ -201,7 +201,109 @@ def access_gpt4(message_history, max_retries=7):
     # If the function reaches this point, it means all retries failed
     raise Exception("Max retries reached. Could not access gpt-4.")
 
+def controller2(query=st.session_state.query):
+    st.session_state.done = False
+    available_functions = [calculate_expression, search_internet]
+    done_phrase = 'Now we are done.'
 
+    # Add the fresh new user message to the history
+    st.session_state.message_history.append({"role": "user", "content": query})
+    openai.api_key = st.session_state.openai_api_key
+    i = st.session_state.iteration_limit
+    while not st.session_state.done and i > 0:
+        i -= 1
+        # Check if message_history is not empty ensuring not a blank submission
+        # First pass through the model
+        if query:
+            response = access_gpt4(st.session_state.message_history)
+
+        # Print the full response for troublshooting
+        # st.write(f' Here is the full initial response: {response}')
+
+        # Get the first response from the model; print for troublehooting
+        message = response["choices"][0]["message"]
+        # st.write(f'Here is the entire response: {response}')
+        # st.write(f'Here is the first message, choices, 0, message, from the response: {message}')   
+        
+        # Here is the content of that first message.
+        first_answer = message["content"]
+        st.markdown(f'**Problem Solver:** {first_answer}')
+        
+        if first_answer is not None:    
+            if done_phrase in first_answer:
+                st.write('We are done - exiting.')
+                st.session_state.done = True
+        
+        
+        # if first_answer != st.session_state.last_result:
+        #     st.write(first_answer)
+        #     st.session_state.last_result = first_answer
+
+        # Add the new system message to the history
+        st.session_state.message_history.append(message)
+        # Step 2, check if the model wants to call a function
+        
+        if message.get("function_call"):
+            function_name = message["function_call"]["name"]
+            st.markdown(f'*Making a function call:* **{function_name}**')
+
+            function_function = globals().get(function_name)
+
+            # test we have the function
+            if function_function is None:
+                print("Couldn't find the function!")
+                sys.exit()
+
+            # Step 3, get the function information using the decorator
+            function_info = function_function.function()
+
+            # Extract function call arguments from the message
+            function_call_args = json.loads(message["function_call"]["arguments"])
+
+            # Filter function call arguments based on available properties
+            filtered_args = {}
+            for arg, value in function_call_args.items():
+                if arg in function_info["parameters"]["properties"]:
+                    filtered_args[arg] = value
+
+            # Step 3, call the function
+            # Note: the JSON response from the model may not be valid JSON
+            function_response = function_function(**filtered_args)
+            # st.write(f'here is the function response: {function_response}')
+            
+            # if function_name == 'search_internet':
+            #     if isinstance(function_response, requests.Response):
+            #         function_response = function_response.json()
+            #         function_response['items'][0]['snippet'] = function_response['items'][0]['snippet'] + 'Now we are done.'
+
+            messages=[
+                    {"role": "user", "content": query},
+                    message,
+                    {
+                        "role": "function",
+                        "name": function_name,
+                        "content": json.dumps(function_response)
+                    },
+                ]
+            
+            st.session_state.message_history.append(messages)
+            
+            # second_response = access_gpt4(messages)
+            # Step 4, send model the info on the function call and function response
+            
+            # st.write(f'here is the second response message after analyzing function output: {second_response}')
+            # message2 = second_response["choices"][0]["message"]
+            
+            # second_answer = message2["content"]
+            # st.write(second_answer)
+            # if second_answer is not None:
+            #     if done_phrase in second_answer:
+                    # st.write('We are done since second anwer had done phrase- exiting.')
+                    # st.session_state.done = True
+                # if second_answer != st.session_state.last_result:
+                #     st.write(second_answer)
+                #     st.session_state.last_result = second_answer
+            # st.write(f' done? {st.session_state.done}')
             
     
 
