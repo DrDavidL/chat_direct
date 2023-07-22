@@ -13,6 +13,7 @@ from openai.error import RateLimitError
 import os
 import time
 import re as regex
+from time import sleep
 
 import sympy as sp
 from sympy import *
@@ -20,6 +21,9 @@ from sympy import sympify, solve, symbols
 from random import randint
 
 st.set_page_config(page_title='Problem Solver', layout = 'centered', page_icon = ':face_palm:', initial_sidebar_state = 'auto')
+
+if "model" not in st.session_state:
+    st.session_state.model = "gpt-3.5-turbo-16k"
 
 if "openai_api_key" not in st.session_state:
     st.session_state.openai_api_key = ''
@@ -38,6 +42,12 @@ if "last_result" not in st.session_state:
     
 if "done" not in st.session_state:
     st.session_state.done = False
+    
+if "step2_message" not in st.session_state:
+    st.session_state.step2_message = ''
+    
+if 'with_fn_output' not in st.session_state:
+    st.session_state.with_fn_output = False
 
 def check_password():
 
@@ -159,10 +169,11 @@ def function_info(func):
     return FunctionWrapper(func)
 
 
-def gen_response(prefix, history, gpt_model):
+def gen_response(prefix, history, model):
     history.append({"role": "system", "content": prefix})
+    sleep(1)
     response = openai.ChatCompletion.create(
-        model=gpt_model,
+        model=st.session_state.model,
         messages = history,
         temperature=0.9,
     )
@@ -175,7 +186,7 @@ def gen_response(prefix, history, gpt_model):
 
 # @st.cache_data
 def access_gpt4(message_history, max_retries=10):
-        
+    sleep(1)    
     delay = 1  # Initial delay in seconds
     available_functions = [calculate_expression, search_internet]
     
@@ -183,7 +194,7 @@ def access_gpt4(message_history, max_retries=10):
     for _ in range(max_retries):
         try:
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model=st.session_state.model,
                 messages=message_history,
                     functions=[func.function() for func in available_functions],
                     function_call="auto",
@@ -199,13 +210,13 @@ def access_gpt4(message_history, max_retries=10):
             break
 
     # If the function reaches this point, it means all retries failed
-    raise Exception("Max retries reached. Could not access gpt-4.")
+    raise Exception("Max retries reached. Could not access gpt.")
 
 def controller2(query=st.session_state.query):
     st.session_state.done = False
+    st.session_state.with_fn_output = False
     available_functions = [calculate_expression, search_internet]
     done_phrase = 'Now we are done.'
-
     # Add the fresh new user message to the history
     st.session_state.message_history.append({"role": "user", "content": query})
     openai.api_key = st.session_state.openai_api_key
@@ -214,8 +225,19 @@ def controller2(query=st.session_state.query):
         i -= 1
         # Check if message_history is not empty ensuring not a blank submission
         # First pass through the model
+        # if query:
+        #     if st.session_state.with_fn_output == False:
+        #             response = access_gpt4(st.session_state.message_history)
+                    
+        #     else:
+        #             # response = access_gpt4(st.session_state.step2_message)
+        #             response = access_gpt4(st.session_state.message_history)
+        sleep(1)            
         if query:
+            sleep(1)
             response = access_gpt4(st.session_state.message_history)
+                    
+
 
         # Print the full response for troublshooting
         # st.write(f' Here is the full initial response: {response}')
@@ -226,11 +248,11 @@ def controller2(query=st.session_state.query):
         # st.write(f'Here is the first message, choices, 0, message, from the response: {message}')   
         
         # Here is the content of that first message.
-        first_answer = message["content"]
-        st.markdown(f'**Problem Solver:** {first_answer}')
+        answer_content = message["content"]
+        st.markdown(f'**Problem Solver:** {answer_content}')
         
-        if first_answer is not None:    
-            if done_phrase in first_answer:
+        if answer_content is not None:    
+            if done_phrase in answer_content:
                 st.write('We are done - exiting.')
                 st.session_state.done = True
         
@@ -244,8 +266,10 @@ def controller2(query=st.session_state.query):
         # Step 2, check if the model wants to call a function
         
         if message.get("function_call"):
+            st.session_state.with_fn_output = True
             function_name = message["function_call"]["name"]
             st.markdown(f'*Making a function call:* **{function_name}**')
+            
 
             function_function = globals().get(function_name)
 
@@ -276,17 +300,22 @@ def controller2(query=st.session_state.query):
             #         function_response = function_response.json()
             #         function_response['items'][0]['snippet'] = function_response['items'][0]['snippet'] + 'Now we are done.'
 
-            messages=[
-                    {"role": "user", "content": query},
-                    message,
-                    {
-                        "role": "function",
-                        "name": function_name,
-                        "content": json.dumps(function_response)
-                    },
-                ]
+            # messages=[
+            #         {"role": "user", "content": query},
+            #         message,
+            #         {
+            #             "role": "function",
+            #             "name": function_name,
+            #             "content": json.dumps(function_response)
+            #         },
+            #     ]
             
-            st.session_state.message_history.append(messages)
+            
+            
+            # st.session_state.step2_message = messages
+            # st.write(f'at end of loop, here is the step 2 message: {st.session_state.step2_message}')
+            
+            st.session_state.message_history.append({"role": "function", "name": function_name, "content": json.dumps(function_response)})
             
             # second_response = access_gpt4(messages)
             # Step 4, send model the info on the function call and function response
@@ -304,7 +333,8 @@ def controller2(query=st.session_state.query):
                 #     st.write(second_answer)
                 #     st.session_state.last_result = second_answer
             # st.write(f' done? {st.session_state.done}')
-            
+        else:
+            st.session_state.with_fn_output = False    
     
 
 def controller(query=st.session_state.query):
@@ -491,7 +521,7 @@ def search_internet(web_query: str) -> float:
     display_search_results(response_data)
     # st.session_state.done = True
     st.write('Done with websearch function')
-    return response.json()
+    return response_data
 
 
 def fetch_api_key():
@@ -529,13 +559,13 @@ def fetch_api_key():
 def start_chat(query):
     
     if st.button('Go', key = "starter"):
-        query = """ When possible use these two functions to assist responses:
-        1. Do not guess or approximate. Always use the 'calculate_expression' function when a calculation is required. The expression syntax must work as input for python sympy library. For trig, use radians. (radians = degrees * pi/180). When the query is fully answered, first perform a fial review. If errors, fix them. If accurate, include: ```Now we are done.``` 
-        2. Always use the 'search_internet' function when updated information from the internet is likely helpful. When the user query is fully answered, first perform a fial review. If errors, fix them. If accurate, include: ```Now we are done.``` 
-        3. If you receive input without a question to answer, summarize the input and include ```Now we are done.```  
+        query = """ Anticipate a user's needs to optimally answer this query. Access these two functions and a final review to ensure current day and accurate responses:
+        1. 'calculate_expression' function: Use whenever a calculation is required to answer a query. The expression syntax must work as input for python sympy library. For trig, use radians. (radians = degrees * pi/180). 
+        2. 'search_internet' function: Use whenever current information from the internet is required to answer a query. Supports all Google Advanced Search operators such (e.g. inurl:, site:, intitle:, etc).
+        3. Final review: When your query response appears complete and optimally helpful for the user, perform a final review to identify any errors in your logic. If accurate, include: ```Now we are done.``` 
         
         Here is your query: """ + query 
-        controller(query)
+        controller2(query)
     
 
 
@@ -548,6 +578,7 @@ if check_password():
     st.info("""Welcome to the Natural Language Calculator and Story Problem Solver. This is a work in progress. Check out the GitHub. 
             As GPT-4 costs $$$ and many problems are multi-step, you have control here to limit the number of iterations.            
             """)
+    st.session_state.model = st.selectbox('Select a model', ['gpt-3.5-turbo-16k', 'gpt-4'])
     st.session_state.iteration_limit = st.number_input('Iteration Limit', min_value=1, max_value=10, value=5)
     st.session_state.query = st.text_area("Type a natural language math problem (e.g, what is the area of a circle with a radius of 4cm), or expression (24 factorial). Or, even ask me: Create a story problem and solve it!")
     # process_query(st.session_state.query)
@@ -595,7 +626,7 @@ if check_password():
         if len(st.session_state.message_history) > 50:
             # Summarize the message history
             summary_prefix = "Following this prompt is a text history of our conversation. Generate a summary of this message history: "
-            summarized_history = gen_response(summary_prefix, st.session_state.message_history, "gpt-4")
+            summarized_history = gen_response(summary_prefix, st.session_state.message_history, st.session_state.model)
             summary = summarized_history['choices'][0]['message']['content']
             # st.write(f'Thread is being summarized as follows: {summary}. Full details are still available for downloading.')
             # Keep the most recent 5 messages intact
