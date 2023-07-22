@@ -367,7 +367,7 @@ def controller(query=st.session_state.query):
         
         if first_answer is not None:    
             if done_phrase in first_answer:
-                st.write('We are done - exiting.')
+                # st.write('We are done - exiting.')
                 st.session_state.done = True
         
         
