@@ -253,7 +253,7 @@ def controller2(query=st.session_state.query):
         
         if answer_content is not None:    
             if done_phrase in answer_content:
-                st.write('We are done - exiting.')
+                # st.write('We are done - exiting.')
                 st.session_state.done = True
         
         
