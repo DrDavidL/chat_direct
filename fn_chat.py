@@ -481,7 +481,22 @@ def calculate_expression(expression: str):
             output = [float(sol) for sol in solutions]
             st.info(f'Here is the calculator output: {output}')
             return output
+        # Special handling for primes
+    elif "primes(" in expression:
+        # Extract the number within the primes function
+        num = int(expression.split("primes(")[1].split(")")[0])
+        
+        # Get the list of primes up to num
+        primes_list = list(primerange(1, num+1))
+        
+        # Check if there's any indexing involved
+        if "[-1]" in expression:
+            output = primes_list[-1]
+        else:
+            output = primes_list  # or handle other index scenarios if needed
 
+        st.info(f'Here is the calculator output: {output}')
+        return output
     # If it's not a solve expression, simply evaluate it
     else:
         output = float(sympify(expression))
