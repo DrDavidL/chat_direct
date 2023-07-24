@@ -14,10 +14,11 @@ import os
 import time
 import re as regex
 from time import sleep
-
+from sympy import sympify, symbols, solve, primerange
+import re as regex
 import sympy as sp
 from sympy import *
-from sympy import sympify, solve, symbols
+# from sympy import sympify, solve, symbols
 from random import randint
 
 st.set_page_config(page_title='Problem Solver', layout = 'centered', page_icon = ':face_palm:', initial_sidebar_state = 'auto')
@@ -205,9 +206,11 @@ def access_gpt4(message_history, max_retries=10):
             time.sleep(delay)
             delay *= 2  # Double the delay each time
         except Exception as e:
+            time.sleep(delay)
+            delay *= 2  # Double the delay each time
             # Handle other exceptions if necessary
-            print(f"Unexpected error: {e}")
-            break
+            st.write(f"Unexpected error: {e}")
+            
 
     # If the function reaches this point, it means all retries failed
     raise Exception("Max retries reached. Could not access gpt.")
@@ -441,6 +444,12 @@ def controller(query=st.session_state.query):
 
 
 
+# Example use:
+# print(calculate_expression("solve(x**2 - 4, x)"))
+# print(calculate_expression("primes(20)[-1]"))
+# print(calculate_expression("cos(pi)"))
+
+
 @function_info
 def calculate_expression(expression: str):
     """
@@ -455,8 +464,9 @@ def calculate_expression(expression: str):
     """
 
     # Check if the string contains the "solve" function
+
+    primes_match = regex.search(r'primes\((\d+)\)', expression)
     st.info(f'Here is the calculator input: {expression}')
-    
     if "solve" in expression:
         # Extract the equation and the variable to solve for
         equation_str = expression.split("solve(")[1].split(",")[0].strip()
@@ -482,27 +492,33 @@ def calculate_expression(expression: str):
             st.info(f'Here is the calculator output: {output}')
             return output
         # Special handling for primes
-    elif "primes(" in expression:
-        # Extract the number within the primes function
-        num = int(expression.split("primes(")[1].split(")")[0])
-        
-        # Get the list of primes up to num
+            
+    elif primes_match:
+        num = int(primes_match.group(1))
         primes_list = list(primerange(1, num+1))
         
-        # Check if there's any indexing involved
-        if "[-1]" in expression:
-            output = primes_list[-1]
+        # Checking for indexing
+        index_match = re.search(r'primes\(\d+\)\[(-?\d+)\]', expression)
+        if index_match:
+            idx = int(index_match.group(1))
+            output = primes_list[idx]
+            st.info(f'Here is the calculator output: {output}')
+            return output
         else:
-            output = primes_list  # or handle other index scenarios if needed
-
-        st.info(f'Here is the calculator output: {output}')
-        return output
+            output = primes_list
+            st.info(f'Here is the calculator output: {output}')
+            return output
+    
+    
     # If it's not a solve expression, simply evaluate it
     else:
-        output = float(sympify(expression))
-        st.info(f'Here is the calculator output: {output}')
-        return output
-
+        try:
+            output = float(sympify(expression))
+            st.info(f'Here is the calculator output: {output}')
+            return output
+        except Exception as e:
+        # Handle exceptions gracefully, you can expand on this or log the error message if needed
+            return f"Our calculator had a problem with use of the expression as formatted: {str(e)}"
 
 @function_info
 def search_internet(web_query: str) -> float:
@@ -574,10 +590,10 @@ def fetch_api_key():
 def start_chat(query):
     
     if st.button('Go', key = "starter"):
-        query = """ Anticipate a user's needs to optimally answer this query. Access these two functions and a final review to ensure current day and accurate responses:
-        1. 'calculate_expression' function: Use whenever a calculation is required to answer a query. The expression syntax must work as input for python sympy library. For trig, use radians. (radians = degrees * pi/180). 
-        2. 'search_internet' function: Use whenever current information from the internet is required to answer a query. Supports all Google Advanced Search operators such (e.g. inurl:, site:, intitle:, etc).
-        3. Final review: When your query response appears complete and optimally helpful for the user, perform a final review to identify any errors in your logic. If accurate, include: ```Now we are done.``` 
+        query = """ Anticipate a user's needs to optimally answer the query. Explicitly solve a problem, do not only tell how to solve it. Call these two functions as needed and perform a final review to ensure current information was accessed when needed and fully accurate responses:
+        1. Invoke 'calculate_expression' function: Use whenever a calculation is required. The expression syntax must work as input for the python sympy library. For trig, use radians. (radians = degrees * pi/180). 
+        2. Invoke 'search_internet' function: Use whenever current information from the internet is required to answer a query. Supports all Google Advanced Search operators such (e.g. inurl:, site:, intitle:, etc).
+        3. Final review: When your query response appears accurate and optimally helpful for the user, perform a final review to identify any errors in your logic. If done, include: ```Now we are done.``` 
         
         Here is your query: """ + query 
         controller2(query)
