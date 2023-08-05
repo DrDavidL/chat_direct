@@ -590,7 +590,7 @@ def fetch_api_key():
 def start_chat(query):
     
     if st.button('Go', key = "starter"):
-        query = """ Anticipate a user's needs to optimally answer the query. Explicitly solve a problem, do not only tell how to solve it. Call these two functions as needed and perform a final review to ensure current information was accessed when needed and fully accurate responses:
+        query = """ Anticipate a user's needs to optimally answer the query. Proceed carefully for accuracy in a stepwise fashion. Explicitly answer the question; do not just describe how to solve it. Call these two functions as needed and perform a final review to ensure current information was accessed when needed and that your response is accurate:
         1. Invoke 'calculate_expression' function: Use whenever a calculation is required. The expression syntax must work as input for the python sympy library. For trig, use radians. (radians = degrees * pi/180). 
         2. Invoke 'search_internet' function: Use whenever current information from the internet is required to answer a query. Supports all Google Advanced Search operators such (e.g. inurl:, site:, intitle:, etc).
         3. Final review: When your query response appears accurate and optimally helpful for the user, perform a final review to identify any errors in your logic. If done, include: ```Now we are done.``` 
