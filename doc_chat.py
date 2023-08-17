@@ -21,7 +21,7 @@ from sympy import *
 # from sympy import sympify, solve, symbols
 from random import randint
 
-st.set_page_config(page_title='Problem Solver', layout = 'centered', page_icon = ':face_palm:', initial_sidebar_state = 'auto')
+st.set_page_config(page_title='Medical Problem Solver', layout = 'centered', page_icon = ':face_palm:', initial_sidebar_state = 'auto')
 
 if "model" not in st.session_state:
     st.session_state.model = "gpt-3.5-turbo-16k"
@@ -199,8 +199,23 @@ def access_gpt4(message_history, max_retries=10):
                 messages=message_history,
                     functions=[func.function() for func in available_functions],
                     function_call="auto",
+                    stream = True,
             )
-            return response
+            start_time = time.time()
+            delay_time = 0.01
+            answer = ""
+            full_answer = ""
+            c = st.empty()
+            for event in response:
+
+                c.markdown(answer)
+                    # full_answer += answer
+                event_time = time.time() - start_time
+                event_text = event['choices'][0]['delta']
+                answer += event_text.get('content', '')
+                full_answer += event_text.get('content', '')
+                time.sleep(delay_time)
+            return full_answer, response
         
         except RateLimitError:
             time.sleep(delay)
@@ -238,7 +253,7 @@ def controller2(query=st.session_state.query):
         sleep(1)            
         if query:
             sleep(1)
-            response = access_gpt4(st.session_state.message_history)
+            answer_content, response = access_gpt4(st.session_state.message_history)
                     
 
 
@@ -246,12 +261,12 @@ def controller2(query=st.session_state.query):
         # st.write(f' Here is the full initial response: {response}')
 
         # Get the first response from the model; print for troublehooting
-        message = response["choices"][0]["message"]
+        # message = response
         # st.write(f'Here is the entire response: {response}')
         # st.write(f'Here is the first message, choices, 0, message, from the response: {message}')   
         
         # Here is the content of that first message.
-        answer_content = message["content"]
+        # answer_content = message["content"]
         st.markdown(f'**Problem Solver:** {answer_content}')
         
         if answer_content is not None:    
@@ -265,12 +280,12 @@ def controller2(query=st.session_state.query):
         #     st.session_state.last_result = first_answer
 
         # Add the new system message to the history
-        st.session_state.message_history.append(message)
+        st.session_state.message_history.append([answer_content])
         # Step 2, check if the model wants to call a function
         
-        if message.get("function_call"):
+        if response.get("function_call"):
             st.session_state.with_fn_output = True
-            function_name = message["function_call"]["name"]
+            function_name = response["function_call"]["name"]
             st.markdown(f'*Making a function call:* **{function_name}**')
             
 
@@ -278,14 +293,14 @@ def controller2(query=st.session_state.query):
 
             # test we have the function
             if function_function is None:
-                st.write("Couldn't find the function!")
+                print("Couldn't find the function!")
                 sys.exit()
 
             # Step 3, get the function information using the decorator
             function_info = function_function.function()
 
             # Extract function call arguments from the message
-            function_call_args = json.loads(message["function_call"]["arguments"])
+            function_call_args = json.loads(response["function_call"]["arguments"])
 
             # Filter function call arguments based on available properties
             filtered_args = {}
@@ -590,7 +605,7 @@ def fetch_api_key():
 def start_chat(query):
     
     if st.button('Go', key = "starter"):
-        query = """ Anticipate a user's needs to optimally answer the query. Proceed carefully for accuracy in a stepwise fashion. Explicitly answer the question; do not just describe how to solve it. Call these two functions as needed and perform a final review to ensure current information was accessed when needed and that your response is accurate:
+        query = """You are an expert physician and surgeon who provides careful stepwise guidance based on the latest medical research. You have access to two functions:
         1. Invoke 'calculate_expression' function: Use whenever a calculation is required. The expression syntax must work as input for the python sympy library. For trig, use radians. (radians = degrees * pi/180). 
         2. Invoke 'search_internet' function: Use whenever current information from the internet is required to answer a query. Supports all Google Advanced Search operators such (e.g. inurl:, site:, intitle:, etc).
         3. Final review: When your query response appears accurate and optimally helpful for the user, perform a final review to identify any errors in your logic. If done, include: ```Now we are done.``` 
@@ -603,15 +618,15 @@ def start_chat(query):
 
 
 # Streamlit functions
-st.title('Natural Language Calculator and Story Problem Solver')
+st.title('Clinician Assistant')
 if check_password():
     fetch_api_key()
-    st.info("""Welcome to the Natural Language Calculator and Story Problem Solver. This is a work in progress. Check out the GitHub. 
+    st.info("""Welcome to the Clinician Assistant - education only! Take with a large grain of salt - validate. This is a work in progress. Check out the GitHub. 
             As GPT-4 costs $$$ and many problems are multi-step, you have control here to limit the number of iterations.            
             """)
     st.session_state.model = st.selectbox('Select a model', ['gpt-3.5-turbo-16k', 'gpt-4'])
     st.session_state.iteration_limit = st.number_input('Iteration Limit', min_value=1, max_value=10, value=5)
-    st.session_state.query = st.text_area("Type a natural language math problem (e.g, what is the area of a circle with a radius of 4cm), or expression (24 factorial). Or, even ask me: Create a story problem and solve it!")
+    st.session_state.query = st.text_area("Describe the medical problem you are trying to solve: ")
     # process_query(st.session_state.query)
     start_chat(st.session_state.query)
     # conversation_text = '\n'.join([f"Role: {message['role']}, Content: {message['content']}" for message in st.session_state.message_history])
